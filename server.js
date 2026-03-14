@@ -6,7 +6,12 @@ const app = express();
 // Configuração do Banco de Dados
 const pool = new Pool({
   connectionString: 'postgres://postgres:UPc5N5qhQi9MyRKpCzBMBzRZu11Qdo7FoujsG2xlLlf15QrPC2X7fdah1IK2ovX7@187.77.53.190:5432/postgres?sslmode=disable',
-  connectionTimeoutMillis: 5000 // 5 segundos para desistir se o banco estiver fora
+  connectionTimeoutMillis: 5000
+});
+
+// ADICIONE ESTAS LINHAS LOGO ABAIXO DA CRIAÇÃO DO POOL
+pool.on('connect', (client) => {
+    client.query('SET search_path TO controle_tarefas, public');
 });
 
 app.use(express.json());
