@@ -13,58 +13,55 @@ app.use(express.urlencoded({ extended: true }));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// 1. Rota Raiz
-app.get('/', (req, res) => {
-    res.send('<h1>🚀 Nexus Task Server Online!</h1>');
-});
-
-// 2. Dashboard com caminho completo no SQL
+// 1. Dashboard (Agora traz o tempo total do banco)
 app.get('/dashboard/:orgId', async (req, res) => {
     const { orgId } = req.params;
     try {
-        // Note o prefixo controle_tarefas. antes das tabelas
         const orgRes = await pool.query('SELECT name FROM controle_tarefas.organizations WHERE id = $1', [orgId]);
-        
-        if (orgRes.rows.length === 0) {
-            return res.status(404).send('<h1>Organização não encontrada</h1>');
-        }
+        if (orgRes.rows.length === 0) return res.status(404).send('Orga não encontrada');
 
-        const tasksRes = await pool.query('SELECT * FROM controle_tarefas.tasks WHERE org_id = $1 ORDER BY created_at DESC', [orgId]);
-        
-        res.render('dashboard', { 
-            tasks: tasksRes.rows, 
-            orgName: orgRes.rows[0].name,
-            orgId: orgId 
-        });
+        const tasksRes = await pool.query(`
+            SELECT t.*, 
+            COALESCE(SUM(EXTRACT(EPOCH FROM (te.end_time - te.start_time))), 0)::INTEGER as total_seconds_tracked
+            FROM controle_tarefas.tasks t
+            LEFT JOIN controle_tarefas.time_entries te ON t.id = te.task_id
+            WHERE t.org_id = $1 AND t.status != 'done'
+            GROUP BY t.id
+            ORDER BY t.created_at DESC
+        `, [orgId]);
+
+        res.render('dashboard', { tasks: tasksRes.rows, orgName: orgRes.rows[0].name, orgId: orgId });
     } catch (err) {
-        console.error("ERRO DASHBOARD:", err.message);
-        res.status(500).send(`<h1>Erro Interno</h1><p>${err.message}</p>`);
+        res.status(500).send(err.message);
     }
 });
 
-// 3. API de Time Tracking com caminho completo
+// 2. A SUA API TIMER (Mantida e protegida)
 app.post('/api/timer', async (req, res) => {
     const { taskId, userId, action } = req.body;
     try {
         if (action === 'start') {
-            await pool.query(
-                'INSERT INTO controle_tarefas.time_entries (task_id, user_id, start_time) VALUES ($1, $2, NOW())', 
-                [taskId, userId]
-            );
+            await pool.query('INSERT INTO controle_tarefas.time_entries (task_id, user_id, start_time) VALUES ($1, $2, NOW())', [taskId, userId]);
         } else {
-            await pool.query(
-                'UPDATE controle_tarefas.time_entries SET end_time = NOW() WHERE task_id = $1 AND end_time IS NULL', 
-                [taskId]
-            );
+            await pool.query('UPDATE controle_tarefas.time_entries SET end_time = NOW() WHERE task_id = $1 AND end_time IS NULL', [taskId]);
         }
         res.json({ success: true });
     } catch (err) {
-        console.error("ERRO NO TIMER:", err.message);
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-const PORT = process.env.PORT || 8081;
-app.listen(PORT, () => {
-    console.log(`📡 Servidor rodando na porta ${PORT}`);
+// 3. Rota para Concluir Tarefa
+app.post('/api/tasks/:taskId/done', async (req, res) => {
+    const { taskId } = req.params;
+    try {
+        await pool.query('UPDATE controle_tarefas.time_entries SET end_time = NOW() WHERE task_id = $1 AND end_time IS NULL', [taskId]);
+        await pool.query("UPDATE controle_tarefas.tasks SET status = 'done' WHERE id = $1", [taskId]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
+
+const PORT = process.env.PORT || 8081;
+app.listen(PORT, () => console.log(`📡 Servidor rodando na porta ${PORT}`));
