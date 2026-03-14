@@ -10,9 +10,9 @@ const pool = new Pool({
 });
 
 // ADICIONE ESTAS LINHAS LOGO ABAIXO DA CRIAÇÃO DO POOL
-pool.on('connect', (client) => {
-    client.query('SET search_path TO controle_tarefas, public');
-});
+//pool.on('connect', (client) => {
+//    client.query('SET search_path TO controle_tarefas, public');
+//});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -70,12 +70,20 @@ app.post('/api/timer', async (req, res) => {
     const { taskId, userId, action } = req.body;
     try {
         if (action === 'start') {
-            await pool.query('INSERT INTO time_entries (task_id, user_id, start_time) VALUES ($1, $2, NOW())', [taskId, userId]);
+            // Usando o caminho completo: schema.tabela
+            await pool.query(
+                'INSERT INTO controle_tarefas.time_entries (task_id, user_id, start_time) VALUES ($1, $2, NOW())', 
+                [taskId, userId]
+            );
         } else {
-            await pool.query('UPDATE time_entries SET end_time = NOW() WHERE task_id = $1 AND end_time IS NULL', [taskId]);
+            await pool.query(
+                'UPDATE controle_tarefas.time_entries SET end_time = NOW() WHERE task_id = $1 AND end_time IS NULL', 
+                [taskId]
+            );
         }
         res.json({ success: true });
     } catch (err) {
+        console.error("ERRO NO BANCO:", err.message); // Isso vai forçar o erro a aparecer no log do Coolify
         res.status(500).json({ success: false, error: err.message });
     }
 });
