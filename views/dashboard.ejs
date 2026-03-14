@@ -9,64 +9,101 @@
     <style>
         body { background-color: #0d1117; color: #c9d1d9; font-family: 'Inter', sans-serif; }
         .card { background-color: #161b22; border: 1px solid #30363d; transition: all 0.2s; }
+        .card:hover { border-color: #58a6ff; }
         .glass-btn { background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.2); }
+        .status-badge { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; }
     </style>
 </head>
 <body class="p-6">
     <div class="max-w-6xl mx-auto">
-        <header class="flex justify-between items-center mb-10">
-            <h1 class="text-3xl font-bold text-white"><%= orgName %></h1>
-            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-500 transition">Nova Tarefa</button>
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-white tracking-tight"><%= orgName %></h1>
+                <div class="flex gap-4 mt-2">
+                    <a href="?view=active" class="text-sm <%= currentView === 'active' ? 'text-blue-400 font-bold border-b-2 border-blue-400' : 'text-gray-500' %>">Tarefas Ativas</a>
+                    <a href="?view=done" class="text-sm <%= currentView === 'done' ? 'text-blue-400 font-bold border-b-2 border-blue-400' : 'text-gray-500' %>">Concluídas</a>
+                </div>
+            </div>
+            <button onclick="document.getElementById('taskModal').classList.remove('hidden')" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-bold transition">
+                + Nova Tarefa
+            </button>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <% tasks.forEach(task => { %>
-                <div id="card-<%= task.id %>" class="card p-6 rounded-2xl flex flex-col justify-between">
-                    <div>
-                        <h3 class="text-xl font-bold text-white mb-2"><%= task.title %></h3>
-                        <p class="text-gray-400 text-sm line-clamp-2"><%= task.description %></p>
-                        <button onclick="openModal('<%= task.title %>', '<%= task.description %>')" class="text-blue-400 text-[10px] uppercase mt-2 font-bold">Ver Detalhes</button>
+                <div id="card-<%= task.id %>" class="card p-6 rounded-2xl flex flex-col">
+                    <div class="flex justify-between items-start mb-4">
+                        <select onchange="updateStatus('<%= task.id %>', this.value)" class="bg-gray-800 text-[10px] font-bold rounded px-2 py-1 border-none focus:ring-1 focus:ring-blue-500">
+                            <option value="backlog" <%= task.status === 'backlog' ? 'selected' : '' %>>BACKLOG</option>
+                            <option value="doing" <%= task.status === 'doing' ? 'selected' : '' %>>DOING</option>
+                            <option value="done" <%= task.status === 'done' ? 'selected' : '' %>>DONE</option>
+                        </select>
+                        <span class="text-[10px] text-gray-500"><%= task.priority %></span>
                     </div>
 
-                    <div class="mt-6 pt-4 border-t border-gray-800 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-white mb-2"><%= task.title %></h3>
+                    <p class="text-gray-400 text-sm line-clamp-2 mb-4"><%= task.description %></p>
+                    
+                    <button onclick="openDetails('<%= task.title %>', '<%= task.description %>')" class="text-blue-400 text-[10px] font-bold uppercase hover:underline mb-6 text-left">
+                        Ver Detalhes
+                    </button>
+
+                    <div class="mt-auto pt-4 border-t border-gray-800 flex items-center justify-between">
                         <div class="flex flex-col">
-                            <span class="text-[10px] text-gray-500 uppercase">Tempo Total</span>
-                            <div id="timer-<%= task.id %>" class="text-blue-400 font-mono text-lg font-bold" data-seconds="<%= task.total_seconds_tracked %>">
+                            <span class="text-[9px] text-gray-500 uppercase">Tempo Rastreado</span>
+                            <div id="timer-<%= task.id %>" class="text-blue-400 font-mono text-xl font-bold" data-seconds="<%= task.total_seconds_tracked %>">
                                 <%= new Date(task.total_seconds_tracked * 1000).toISOString().substr(11, 8) %>
                             </div>
                         </div>
-                        
-                        <div class="flex gap-2">
-                            <button onclick="markDone('<%= task.id %>')" class="p-2 rounded-full bg-gray-800 text-green-500 hover:bg-green-600 hover:text-white transition">
-                                <i data-lucide="check-circle" class="w-5 h-5"></i>
-                            </button>
-                            <button onclick="toggleTimer('<%= task.id %>')" class="p-2 rounded-full glass-btn text-blue-400 hover:bg-blue-600 hover:text-white transition">
-                                <i data-lucide="play" id="icon-<%= task.id %>" class="w-5 h-5"></i>
-                            </button>
-                        </div>
+
+                        <% if (currentView !== 'done') { %>
+                        <button onclick="toggleTimer('<%= task.id %>')" class="p-3 rounded-full glass-btn text-blue-400 hover:bg-blue-600 hover:text-white transition">
+                            <i data-lucide="play" id="icon-<%= task.id %>" class="w-6 h-6"></i>
+                        </button>
+                        <% } %>
                     </div>
                 </div>
             <% }) %>
         </div>
     </div>
 
-    <div id="modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4">
-        <div class="bg-[#161b22] border border-[#30363d] p-8 rounded-2xl max-w-lg w-full">
-            <h2 id="modal-title" class="text-2xl font-bold text-white mb-4"></h2>
-            <p id="modal-desc" class="text-gray-400 mb-6"></p>
-            <button onclick="closeModal()" class="w-full bg-gray-800 py-2 rounded-lg font-bold">Fechar</button>
+    <div id="taskModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-[#161b22] border border-[#30363d] p-8 rounded-2xl w-full max-w-md">
+            <h2 class="text-2xl font-bold text-white mb-6">Criar Nova Tarefa</h2>
+            <div class="space-y-4">
+                <input type="text" id="newTitle" placeholder="Título da tarefa" class="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg focus:outline-none focus:border-blue-500">
+                <textarea id="newDesc" placeholder="Descrição detalhada..." class="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg h-32 focus:outline-none focus:border-blue-500"></textarea>
+                <select id="newPriority" class="w-full bg-gray-900 border border-gray-700 p-3 rounded-lg focus:outline-none focus:border-blue-500">
+                    <option value="low">Baixa Prioridade</option>
+                    <option value="medium" selected>Média Prioridade</option>
+                    <option value="high">Alta Prioridade</option>
+                </select>
+                <div class="flex gap-3 pt-4">
+                    <button onclick="document.getElementById('taskModal').classList.add('hidden')" class="flex-1 py-3 text-gray-400 font-bold">Cancelar</button>
+                    <button onclick="createTask()" class="flex-1 bg-blue-600 py-3 rounded-lg font-bold text-white hover:bg-blue-500">Criar Tarefa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="detailsModal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-[#161b22] border border-[#30363d] p-8 rounded-2xl w-full max-w-lg">
+            <h2 id="detTitle" class="text-2xl font-bold text-white mb-4"></h2>
+            <div id="detDesc" class="text-gray-400 text-sm leading-relaxed mb-8 whitespace-pre-wrap"></div>
+            <button onclick="document.getElementById('detailsModal').classList.add('hidden')" class="w-full bg-gray-800 py-3 rounded-lg font-bold">Fechar</button>
         </div>
     </div>
 
     <script>
         lucide.createIcons();
-        let intervals = {};
+        let timers = {};
 
+        // Lógica do Cronômetro
         async function toggleTimer(taskId) {
             const icon = document.getElementById(`icon-${taskId}`);
-            const timerDiv = document.getElementById(`timer-${taskId}`);
+            const display = document.getElementById(`timer-${taskId}`);
             const isStarting = icon.getAttribute('data-lucide') === 'play';
-            let currentSeconds = parseInt(timerDiv.getAttribute('data-seconds'));
+            let secs = parseInt(display.getAttribute('data-seconds'));
 
             const res = await fetch('/api/timer', {
                 method: 'POST',
@@ -77,33 +114,52 @@
             if (res.ok) {
                 if (isStarting) {
                     icon.setAttribute('data-lucide', 'square');
-                    intervals[taskId] = setInterval(() => {
-                        currentSeconds++;
-                        timerDiv.setAttribute('data-seconds', currentSeconds);
-                        timerDiv.innerText = new Date(currentSeconds * 1000).toISOString().substr(11, 8);
+                    timers[taskId] = setInterval(() => {
+                        secs++;
+                        display.setAttribute('data-seconds', secs);
+                        display.innerText = new Date(secs * 1000).toISOString().substr(11, 8);
                     }, 1000);
                 } else {
                     icon.setAttribute('data-lucide', 'play');
-                    clearInterval(intervals[taskId]);
+                    clearInterval(timers[taskId]);
                 }
                 lucide.createIcons();
             }
         }
 
-        async function markDone(taskId) {
-            if (confirm('Concluir tarefa?')) {
-                const res = await fetch(`/api/tasks/${taskId}/done`, { method: 'POST' });
-                if (res.ok) document.getElementById(`card-${taskId}`).remove();
-            }
+        // Criar Tarefa
+        async function createTask() {
+            const title = document.getElementById('newTitle').value;
+            const description = document.getElementById('newDesc').value;
+            const priority = document.getElementById('newPriority').value;
+            
+            if (!title) return alert('Dê um título à tarefa');
+
+            const res = await fetch('/api/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description, priority, orgId: '<%= orgId %>' })
+            });
+
+            if (res.ok) location.reload();
         }
 
-        function openModal(title, desc) {
-            document.getElementById('modal-title').innerText = title;
-            document.getElementById('modal-desc').innerText = desc;
-            document.getElementById('modal').classList.remove('hidden');
+        // Atualizar Status
+        async function updateStatus(taskId, status) {
+            const res = await fetch(`/api/tasks/${taskId}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            if (res.ok) location.reload();
         }
 
-        function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+        // Modais
+        function openDetails(title, desc) {
+            document.getElementById('detTitle').innerText = title;
+            document.getElementById('detDesc').innerText = desc;
+            document.getElementById('detailsModal').classList.remove('hidden');
+        }
     </script>
 </body>
 </html>
