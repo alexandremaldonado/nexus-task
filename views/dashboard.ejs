@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title><%= orgName %> | Nexus Task</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-[#0f111a] text-gray-100 font-sans h-screen flex overflow-hidden">
+
+    <aside class="w-64 bg-[#161925] border-r border-gray-800 p-6 flex flex-col">
+        <div class="flex items-center gap-3 mb-10">
+            <div class="bg-blue-600 p-2 rounded-lg"><i data-lucide="layout-grid" class="text-white"></i></div>
+            <h1 class="text-xl font-bold tracking-tight">Nexus</h1>
+        </div>
+        <nav class="flex-1 space-y-2">
+            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Workspace</p>
+            <a href="#" class="flex items-center gap-3 p-3 rounded-xl bg-blue-600/10 text-blue-400 border border-blue-500/20">
+                <i data-lucide="check-square" size="18"></i> Tarefas
+            </a>
+            <a href="#" class="flex items-center gap-3 p-3 rounded-xl text-gray-500 hover:bg-gray-800 transition">
+                <i data-lucide="users" size="18"></i> Equipe
+            </a>
+        </nav>
+    </aside>
+
+    <main class="flex-1 flex flex-col">
+        <header class="h-20 border-b border-gray-800 flex items-center justify-between px-10 bg-[#161925]/50">
+            <div>
+                <h2 class="text-2xl font-bold"><%= orgName %></h2>
+                <p class="text-xs text-gray-500">Gestão de Demandas & Time Tracking</p>
+            </div>
+            <button class="bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition shadow-lg shadow-blue-600/20">
+                <i data-lucide="plus" size="18"></i> Criar Tarefa
+            </button>
+        </header>
+
+        <div class="p-10 flex gap-8 overflow-x-auto">
+            <% const statuses = ['backlog', 'doing', 'done']; %>
+            <% statuses.forEach(status => { %>
+                <div class="w-80 flex-shrink-0">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="capitalize font-semibold text-gray-400 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full <%= status === 'doing' ? 'bg-blue-500' : 'bg-gray-600' %>"></span>
+                            <%= status %>
+                        </h3>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <% tasks.filter(t => t.status === status).forEach(task => { %>
+                            <div class="bg-[#1c202f] border border-gray-800 p-5 rounded-2xl hover:border-gray-600 transition shadow-sm">
+                                <h4 class="font-medium text-gray-200"><%= task.title %></h4>
+                                <div class="mt-4 flex items-center justify-between">
+                                    <div class="text-[10px] text-gray-500 flex items-center gap-1">
+                                        <i data-lucide="clock" size="12"></i>
+                                        <%= task.due_date ? new Date(task.due_date).toLocaleDateString() : 'Sem prazo' %>
+                                    </div>
+                                    <button onclick="toggleTimer('<%= task.id %>')" class="text-gray-400 hover:text-blue-400 transition">
+                                        <i data-lucide="<%= status === 'doing' ? 'pause-circle' : 'play-circle' %>"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+            <% }) %>
+        </div>
+    </main>
+
+    <script>
+        lucide.createIcons();
+        async function toggleTimer(taskId) {
+            // Lógica para disparar o n8n ou o próprio servidor Node
+            console.log('Timer alterado para tarefa:', taskId);
+        }
+    </script>
+</body>
+</html>
