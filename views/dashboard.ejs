@@ -2,76 +2,121 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title><%= orgName %> | Nexus Task</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Task - <%= orgName %></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { background-color: #0d1117; color: #c9d1d9; }
+        .card { background-color: #161b22; border: 1px solid #30363d; }
+    </style>
 </head>
-<body class="bg-[#0f111a] text-gray-100 font-sans h-screen flex overflow-hidden">
-
-    <aside class="w-64 bg-[#161925] border-r border-gray-800 p-6 flex flex-col">
-        <div class="flex items-center gap-3 mb-10">
-            <div class="bg-blue-600 p-2 rounded-lg"><i data-lucide="layout-grid" class="text-white"></i></div>
-            <h1 class="text-xl font-bold tracking-tight">Nexus</h1>
-        </div>
-        <nav class="flex-1 space-y-2">
-            <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">Workspace</p>
-            <a href="#" class="flex items-center gap-3 p-3 rounded-xl bg-blue-600/10 text-blue-400 border border-blue-500/20">
-                <i data-lucide="check-square" size="18"></i> Tarefas
-            </a>
-            <a href="#" class="flex items-center gap-3 p-3 rounded-xl text-gray-500 hover:bg-gray-800 transition">
-                <i data-lucide="users" size="18"></i> Equipe
-            </a>
-        </nav>
-    </aside>
-
-    <main class="flex-1 flex flex-col">
-        <header class="h-20 border-b border-gray-800 flex items-center justify-between px-10 bg-[#161925]/50">
+<body class="p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="flex justify-between items-center mb-10">
             <div>
-                <h2 class="text-2xl font-bold"><%= orgName %></h2>
-                <p class="text-xs text-gray-500">Gestão de Demandas & Time Tracking</p>
+                <h1 class="text-2xl font-bold text-white"><%= orgName %></h1>
+                <p class="text-gray-400 text-sm">Nexus Task Dashboard</p>
             </div>
-            <button class="bg-blue-600 hover:bg-blue-500 px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition shadow-lg shadow-blue-600/20">
-                <i data-lucide="plus" size="18"></i> Criar Tarefa
-            </button>
+            <div class="text-right">
+                <span class="bg-blue-900 text-blue-200 text-xs px-2 py-1 rounded">ID: <%= orgId %></span>
+            </div>
         </header>
 
-        <div class="p-10 flex gap-8 overflow-x-auto">
-            <% const statuses = ['backlog', 'doing', 'done']; %>
-            <% statuses.forEach(status => { %>
-                <div class="w-80 flex-shrink-0">
-                    <div class="flex items-center justify-between mb-6">
-                        <h3 class="capitalize font-semibold text-gray-400 flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full <%= status === 'doing' ? 'bg-blue-500' : 'bg-gray-600' %>"></span>
-                            <%= status %>
-                        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <% tasks.forEach(task => { %>
+                <div class="card p-5 rounded-xl shadow-lg relative overflow-hidden">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full 
+                            <%= task.priority === 'high' ? 'bg-red-900 text-red-200' : 'bg-gray-800 text-gray-300' %>">
+                            <%= task.priority %>
+                        </span>
                     </div>
-                    
-                    <div class="space-y-4">
-                        <% tasks.filter(t => t.status === status).forEach(task => { %>
-                            <div class="bg-[#1c202f] border border-gray-800 p-5 rounded-2xl hover:border-gray-600 transition shadow-sm">
-                                <h4 class="font-medium text-gray-200"><%= task.title %></h4>
-                                <div class="mt-4 flex items-center justify-between">
-                                    <div class="text-[10px] text-gray-500 flex items-center gap-1">
-                                        <i data-lucide="clock" size="12"></i>
-                                        <%= task.due_date ? new Date(task.due_date).toLocaleDateString() : 'Sem prazo' %>
-                                    </div>
-                                    <button onclick="toggleTimer('<%= task.id %>')" class="text-gray-400 hover:text-blue-400 transition">
-                                        <i data-lucide="<%= status === 'doing' ? 'pause-circle' : 'play-circle' %>"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        <% }) %>
+
+                    <h3 class="text-lg font-semibold text-white mb-2"><%= task.title %></h3>
+                    <p class="text-gray-400 text-sm mb-6"><%= task.description %></p>
+
+                    <div class="mt-4 pt-4 border-t border-gray-800 flex items-center justify-between">
+                        <div id="timer-<%= task.id %>" class="text-blue-400 font-mono text-sm hidden font-bold">
+                            00:00:00
+                        </div>
+                        
+                        <button 
+                            onclick="toggleTimer('<%= task.id %>')" 
+                            data-task-id="<%= task.id %>" 
+                            class="timer-btn text-gray-400 hover:text-blue-400 transition transform hover:scale-110"
+                        >
+                            <i data-lucide="play-circle" id="icon-<%= task.id %>"></i>
+                        </button>
                     </div>
                 </div>
             <% }) %>
         </div>
-    </main>
+    </div>
 
     <script>
+        // Inicializa os ícones da biblioteca Lucide
         lucide.createIcons();
+        
+        // Objeto para guardar os intervalos dos cronômetros ativos
+        let activeTimers = {};
+
         async function toggleTimer(taskId) {
-            // Lógica para disparar o n8n ou o próprio servidor Node
-            console.log('Timer alterado para tarefa:', taskId);
+            const icon = document.getElementById(`icon-${taskId}`);
+            const isStarting = icon.getAttribute('data-lucide') === 'play-circle';
+            const userId = '550e8400-e29b-41d4-a716-446655440000'; // ID padrão do admin
+
+            try {
+                // 1. Avisa o Backend (server.js)
+                const response = await fetch('/api/timer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        taskId: taskId,
+                        userId: userId,
+                        action: isStarting ? 'start' : 'stop'
+                    })
+                });
+
+                if (response.ok) {
+                    if (isStarting) {
+                        // 2. Muda o ícone para PAUSE
+                        icon.setAttribute('data-lucide', 'pause-circle');
+                        icon.parentElement.classList.add('text-red-500');
+                        startVisualTimer(taskId);
+                    } else {
+                        // 3. Muda o ícone para PLAY
+                        icon.setAttribute('data-lucide', 'play-circle');
+                        icon.parentElement.classList.remove('text-red-500');
+                        stopVisualTimer(taskId);
+                    }
+                    // Atualiza o desenho do ícone
+                    lucide.createIcons();
+                }
+            } catch (err) {
+                console.error('Erro ao conectar com o servidor:', err);
+                alert('Erro ao processar o timer no servidor.');
+            }
+        }
+
+        function startVisualTimer(taskId) {
+            const display = document.getElementById(`timer-${taskId}`);
+            display.classList.remove('hidden');
+            let seconds = 0;
+
+            activeTimers[taskId] = setInterval(() => {
+                seconds++;
+                const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+                const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+                const s = String(seconds % 60).padStart(2, '0');
+                display.innerText = `${h}:${m}:${s}`;
+            }, 1000);
+        }
+
+        function stopVisualTimer(taskId) {
+            clearInterval(activeTimers[taskId]);
+            // Opcional: esconder ou resetar o tempo após parar
+            // document.getElementById(`timer-${taskId}`).classList.add('hidden');
         }
     </script>
 </body>
