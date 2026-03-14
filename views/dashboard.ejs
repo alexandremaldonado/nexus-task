@@ -9,109 +9,101 @@
     <style>
         body { background-color: #0d1117; color: #c9d1d9; font-family: 'Inter', sans-serif; }
         .card { background-color: #161b22; border: 1px solid #30363d; transition: all 0.2s; }
-        .card:hover { border-color: #58a6ff; transform: translateY(-2px); }
         .glass-btn { background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.2); }
     </style>
 </head>
-<body class="p-4 md:p-10">
+<body class="p-6">
     <div class="max-w-6xl mx-auto">
-        <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
-            <div>
-                <h1 class="text-3xl font-extrabold text-white tracking-tight"><%= orgName %></h1>
-                <p class="text-gray-400 mt-1">Gerenciamento de Fluxo e Time Tracking</p>
-            </div>
-            <div class="flex gap-3">
-                <button onclick="alert('Funcionalidade de formulário será a próxima!')" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg font-bold transition shadow-lg">
-                    <i data-lucide="plus-circle" class="w-5 h-5"></i> Nova Tarefa
-                </button>
-            </div>
+        <header class="flex justify-between items-center mb-10">
+            <h1 class="text-3xl font-bold text-white"><%= orgName %></h1>
+            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-500 transition">Nova Tarefa</button>
         </header>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <% tasks.forEach(task => { %>
-                <div class="card p-6 rounded-2xl flex flex-col justify-between">
+                <div id="card-<%= task.id %>" class="card p-6 rounded-2xl flex flex-col justify-between">
                     <div>
-                        <div class="flex justify-between items-start mb-4">
-                            <span class="text-[10px] uppercase tracking-widest font-black px-2 py-1 rounded bg-gray-800 text-blue-400">
-                                <%= task.priority || 'Normal' %>
-                            </span>
-                            <span class="text-gray-500 text-[10px]"><%= new Date(task.created_at).toLocaleDateString() %></span>
-                        </div>
-                        <h3 class="text-xl font-bold text-white mb-2 leading-tight"><%= task.title %></h3>
-                        <p class="text-gray-400 text-sm line-clamp-2 mb-6"><%= task.description %></p>
+                        <h3 class="text-xl font-bold text-white mb-2"><%= task.title %></h3>
+                        <p class="text-gray-400 text-sm line-clamp-2"><%= task.description %></p>
+                        <button onclick="openModal('<%= task.title %>', '<%= task.description %>')" class="text-blue-400 text-[10px] uppercase mt-2 font-bold">Ver Detalhes</button>
                     </div>
 
-                    <div class="mt-auto pt-6 border-t border-gray-800 flex items-center justify-between">
-                        <div id="timer-<%= task.id %>" class="text-blue-400 font-mono text-lg font-bold hidden animate-pulse">
-                            00:00:00
+                    <div class="mt-6 pt-4 border-t border-gray-800 flex items-center justify-between">
+                        <div class="flex flex-col">
+                            <span class="text-[10px] text-gray-500 uppercase">Tempo Total</span>
+                            <div id="timer-<%= task.id %>" class="text-blue-400 font-mono text-lg font-bold" data-seconds="<%= task.total_seconds_tracked %>">
+                                <%= new Date(task.total_seconds_tracked * 1000).toISOString().substr(11, 8) %>
+                            </div>
                         </div>
-                        <div id="status-<%= task.id %>" class="text-gray-500 text-xs font-medium italic">Aguardando...</div>
                         
-                        <button 
-                            onclick="toggleTimer('<%= task.id %>')" 
-                            class="p-3 rounded-full glass-btn text-blue-400 hover:text-white hover:bg-blue-600 transition duration-300"
-                        >
-                            <i data-lucide="play" id="icon-<%= task.id %>" class="w-6 h-6"></i>
-                        </button>
+                        <div class="flex gap-2">
+                            <button onclick="markDone('<%= task.id %>')" class="p-2 rounded-full bg-gray-800 text-green-500 hover:bg-green-600 hover:text-white transition">
+                                <i data-lucide="check-circle" class="w-5 h-5"></i>
+                            </button>
+                            <button onclick="toggleTimer('<%= task.id %>')" class="p-2 rounded-full glass-btn text-blue-400 hover:bg-blue-600 hover:text-white transition">
+                                <i data-lucide="play" id="icon-<%= task.id %>" class="w-5 h-5"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             <% }) %>
         </div>
     </div>
 
+    <div id="modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4">
+        <div class="bg-[#161b22] border border-[#30363d] p-8 rounded-2xl max-w-lg w-full">
+            <h2 id="modal-title" class="text-2xl font-bold text-white mb-4"></h2>
+            <p id="modal-desc" class="text-gray-400 mb-6"></p>
+            <button onclick="closeModal()" class="w-full bg-gray-800 py-2 rounded-lg font-bold">Fechar</button>
+        </div>
+    </div>
+
     <script>
         lucide.createIcons();
-        let activeTimers = {};
+        let intervals = {};
 
         async function toggleTimer(taskId) {
             const icon = document.getElementById(`icon-${taskId}`);
-            const statusLabel = document.getElementById(`status-${taskId}`);
+            const timerDiv = document.getElementById(`timer-${taskId}`);
             const isStarting = icon.getAttribute('data-lucide') === 'play';
-            const userId = '550e8400-e29b-41d4-a716-446655440000';
+            let currentSeconds = parseInt(timerDiv.getAttribute('data-seconds'));
 
-            try {
-                const response = await fetch('/api/timer', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ taskId, userId, action: isStarting ? 'start' : 'stop' })
-                });
+            const res = await fetch('/api/timer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ taskId, userId: '550e8400-e29b-41d4-a716-446655440000', action: isStarting ? 'start' : 'stop' })
+            });
 
-                if (response.ok) {
-                    if (isStarting) {
-                        icon.setAttribute('data-lucide', 'square');
-                        statusLabel.innerText = "Em progresso...";
-                        startVisualTimer(taskId);
-                    } else {
-                        icon.setAttribute('data-lucide', 'play');
-                        statusLabel.innerText = "Pausado";
-                        stopVisualTimer(taskId);
-                    }
-                    lucide.createIcons();
+            if (res.ok) {
+                if (isStarting) {
+                    icon.setAttribute('data-lucide', 'square');
+                    intervals[taskId] = setInterval(() => {
+                        currentSeconds++;
+                        timerDiv.setAttribute('data-seconds', currentSeconds);
+                        timerDiv.innerText = new Date(currentSeconds * 1000).toISOString().substr(11, 8);
+                    }, 1000);
+                } else {
+                    icon.setAttribute('data-lucide', 'play');
+                    clearInterval(intervals[taskId]);
                 }
-            } catch (err) {
-                alert('Erro de conexão com o servidor.');
+                lucide.createIcons();
             }
         }
 
-        function startVisualTimer(taskId) {
-            const display = document.getElementById(`timer-${taskId}`);
-            const statusLabel = document.getElementById(`status-${taskId}`);
-            display.classList.remove('hidden');
-            statusLabel.classList.add('hidden');
-            let seconds = 0;
-
-            activeTimers[taskId] = setInterval(() => {
-                seconds++;
-                const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
-                const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-                const s = String(seconds % 60).padStart(2, '0');
-                display.innerText = `${h}:${m}:${s}`;
-            }, 1000);
+        async function markDone(taskId) {
+            if (confirm('Concluir tarefa?')) {
+                const res = await fetch(`/api/tasks/${taskId}/done`, { method: 'POST' });
+                if (res.ok) document.getElementById(`card-${taskId}`).remove();
+            }
         }
 
-        function stopVisualTimer(taskId) {
-            clearInterval(activeTimers[taskId]);
+        function openModal(title, desc) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-desc').innerText = desc;
+            document.getElementById('modal').classList.remove('hidden');
         }
+
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); }
     </script>
 </body>
 </html>
